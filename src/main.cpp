@@ -112,6 +112,7 @@ class Application {
 public:
   Application() : m_window(sf::VideoMode{1280, 720}, "snake") {
     m_window.setFramerateLimit(120); // reduce energy waste
+    m_window.setVerticalSyncEnabled(true);
     reset();
   }
 

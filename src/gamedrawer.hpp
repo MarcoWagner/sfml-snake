@@ -77,10 +77,16 @@ class GameDrawer {
   static constexpr auto playfield_margin = 32;
   static constexpr auto tile_size = 16;
   sf::RectangleShape m_rect_playfield;
-  sf::RectangleShape m_shape_playerHead;
-  sf::RectangleShape m_shape_playerBody;
-  sf::RectangleShape m_shape_playerTail;
-  sf::RectangleShape m_shape_food;
+  sf::Texture m_texture_snake_head;
+  sf::Sprite m_shape_snake_head;
+  sf::Texture m_texture_snake_body_straight;
+  sf::Sprite m_shape_snake_body_straight;
+  sf::Texture m_texture_snake_body_bend;
+  sf::Sprite m_shape_snake_body_bend;
+  sf::Texture m_texture_snake_tail;
+  sf::Sprite m_shape_snake_tail;
+  sf::Texture m_texture_food;
+  sf::Sprite m_shape_food;
 
   void init_playfield() {
     m_rect_playfield.setSize(sf::Vector2f{tile_size * Game::playfield_width,
@@ -90,49 +96,117 @@ class GameDrawer {
     m_rect_playfield.setOutlineColor(sf::Color::White);
     m_rect_playfield.setFillColor(sf::Color::Transparent);
 
-    m_shape_playerHead.setSize(sf::Vector2f{tile_size, tile_size});
-    m_shape_playerHead.setFillColor(sf::Color{0x9b, 0xad, 0xb7});
+    Logger::warn(
+        m_texture_snake_head.loadFromFile("../resource/snake_head.png"),
+        "failed loading image, snake_head");
+    m_shape_snake_head.setTexture(m_texture_snake_head);
+    m_shape_snake_head.setOrigin(8.0F, 8.0F);
 
-    m_shape_playerBody.setSize(sf::Vector2f{tile_size, tile_size});
-    m_shape_playerBody.setFillColor(sf::Color{0x69, 0x6a, 0x6a});
+    Logger::warn(m_texture_snake_body_straight.loadFromFile(
+                     "../resource/snake_body_straight.png"),
+                 "failed loading image, snake_body_straight");
+    m_shape_snake_body_straight.setTexture(m_texture_snake_body_straight);
+    m_shape_snake_body_straight.setOrigin(8.0F, 8.0F);
 
-    m_shape_playerTail.setSize(sf::Vector2f{tile_size, tile_size});
-    m_shape_playerTail.setFillColor(sf::Color{0x59, 0x56, 0x52});
+    Logger::warn(m_texture_snake_body_bend.loadFromFile(
+                     "../resource/snake_body_bend.png"),
+                 "failed loading image, snake_body_bend");
+    m_shape_snake_body_bend.setTexture(m_texture_snake_body_bend);
+    m_shape_snake_body_bend.setOrigin(8.0F, 8.0F);
 
-    m_shape_food.setSize(sf::Vector2f{tile_size, tile_size});
-    m_shape_food.setFillColor(sf::Color{0xd9, 0x57, 0x63});
+    Logger::warn(
+        m_texture_snake_tail.loadFromFile("../resource/snake_tail.png"),
+        "failed loading image, snake_tail");
+    m_shape_snake_tail.setTexture(m_texture_snake_tail);
+    m_shape_snake_tail.setOrigin(8.0F, 8.0F);
+
+    Logger::warn(m_texture_food.loadFromFile("../resource/food.png"),
+                 "failed loading image, food");
+    m_shape_food.setTexture(m_texture_food);
+  }
+
+  sf::Sprite *get_snake_sprite(const SnakeTile &current_tile,
+                               const SnakeTile *prev_tile) {
+    sf::Sprite *sprite{};
+
+    bool clockwise = false;
+
+    switch (current_tile.part) {
+    case SnakeTile::Part::Body:
+      if (prev_tile && prev_tile->facing != current_tile.facing) {
+        sprite = &m_shape_snake_body_bend;
+
+        clockwise = (prev_tile->facing == SnakeTile::Direction::Right &&
+                     current_tile.facing == SnakeTile::Direction::Down) ||
+                    (prev_tile->facing == SnakeTile::Direction::Down &&
+                     current_tile.facing == SnakeTile::Direction::Left) ||
+                    (prev_tile->facing == SnakeTile::Direction::Left &&
+                     current_tile.facing == SnakeTile::Direction::Up) ||
+                    (prev_tile->facing == SnakeTile::Direction::Up &&
+                     current_tile.facing == SnakeTile::Direction::Right);
+
+      } else {
+        sprite = &m_shape_snake_body_straight;
+      }
+      break;
+    case SnakeTile::Part::Head:
+      sprite = &m_shape_snake_head;
+      break;
+    case SnakeTile::Part::Tail:
+      sprite = &m_shape_snake_tail;
+      break;
+    }
+
+    // the "left bend" gets used as "right bend"
+    const auto degree = clockwise ? 90.0F : 0.0F;
+
+    switch (current_tile.facing) {
+    case SnakeTile::Direction::Right:
+      sprite->setRotation(0.0F + degree);
+      break;
+    case SnakeTile::Direction::Down:
+      sprite->setRotation(90.0F + degree);
+      break;
+    case SnakeTile::Direction::Left:
+      sprite->setRotation(180.0F + degree);
+      break;
+    case SnakeTile::Direction::Up:
+      sprite->setRotation(270.0F + degree);
+      break;
+    }
+
+    return sprite;
+  }
+
+  void draw_snake(const Snake &snake) {
+    const SnakeTile *prev_tile{};
+    for (const auto &tile : snake.tiles) {
+      auto sprite = get_snake_sprite(tile, prev_tile);
+      sprite->setPosition(
+          sf::Vector2f{static_cast<float>(tile_size * tile.position.x +
+                                          playfield_margin + tile_size / 2),
+                       static_cast<float>(tile_size * tile.position.y +
+                                          playfield_margin + tile_size / 2)});
+      m_target->draw(*sprite);
+      prev_tile = &tile;
+    }
+  }
+
+  void draw_food(const FoodCollection &food) {
+    for (const auto &f : food) {
+      m_shape_food.setPosition(sf::Vector2f{
+          static_cast<float>(tile_size * f.position.x + playfield_margin),
+          static_cast<float>(tile_size * f.position.y + playfield_margin)});
+      m_target->draw(m_shape_food);
+    }
   }
 
   void draw_playfield() {
-    m_target->draw(m_rect_playfield);
-
     const auto &game_state = m_game->get_state();
 
-    for (const auto &tile : game_state.player.tiles) {
-      sf::Shape *shape{};
-      switch (tile.part) {
-      case SnakeTile::Part::Body:
-        shape = &m_shape_playerBody;
-        break;
-      case SnakeTile::Part::Head:
-        shape = &m_shape_playerHead;
-        break;
-      case SnakeTile::Part::Tail:
-        shape = &m_shape_playerTail;
-        break;
-      }
-      shape->setPosition(sf::Vector2f{
-          static_cast<float>(tile_size * tile.position.x + playfield_margin),
-          static_cast<float>(tile_size * tile.position.y + playfield_margin)});
-      m_target->draw(*shape);
-    }
-
-    for (const auto &food : game_state.food) {
-      m_shape_food.setPosition(sf::Vector2f{
-          static_cast<float>(tile_size * food.position.x + playfield_margin),
-          static_cast<float>(tile_size * food.position.y + playfield_margin)});
-      m_target->draw(m_shape_food);
-    }
+    m_target->draw(m_rect_playfield);
+    draw_snake(game_state.player);
+    draw_food(game_state.food);
   }
 
 public:

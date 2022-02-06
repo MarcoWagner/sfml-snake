@@ -29,18 +29,21 @@ struct SnakeTile {
   Direction facing{Direction::Right};
 };
 
+using SnakeTileCollection = std::vector<SnakeTile>;
+
 struct Snake {
-  int length{1};
-  std::vector<SnakeTile> tiles{};
+  int length{1}; // start length
+  SnakeTileCollection tiles{};
 };
 
 struct Food {
   Position position{};
 };
+using FoodCollection = std::vector<Food>;
 
 struct GameState {
   Snake player;
-  std::vector<Food> food;
+  FoodCollection food;
 };
 
 class Game : public IntervalRunner {
@@ -50,8 +53,6 @@ class Game : public IntervalRunner {
   std::random_device m_rd;
   std::uniform_int_distribution<int> m_food_dist{
       0, playfield_width *playfield_height - 1};
-
-  using food_iterator = decltype(m_state.food)::const_iterator;
 
   void advance_head(Snake &snake) {
     auto head = snake.tiles.back();
@@ -98,13 +99,14 @@ class Game : public IntervalRunner {
     }
   }
 
-  food_iterator find_food_collision(const Position &what) const {
+  FoodCollection::const_iterator
+  find_food_collision(const Position &what) const {
     return std::find_if(
         begin(m_state.food), end(m_state.food),
         [&what](const auto &food) { return food.position == what; });
   }
 
-  void collect_food(Snake &snake, food_iterator it) {
+  void collect_food(Snake &snake, FoodCollection::const_iterator it) {
     ++snake.length;
     ++m_stats.score;
     m_state.food.erase(it);
@@ -158,7 +160,7 @@ class Game : public IntervalRunner {
 public:
   static constexpr auto playfield_width = 75;
   static constexpr auto playfield_height = 40;
-  static constexpr auto initial_food_count = 10;
+  static constexpr auto initial_food_count = 20;
 
   Game() : IntervalRunner(FPS{12}) {
     auto snake = SnakeTile{};
